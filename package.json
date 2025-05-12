@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/index.js",
-    "build": "pnpm dlx tsc --build",
+    "build": "tsc --build",
     "build:watch": "pnpm dlx tsc --build --watch",
     "dev": "nodemon ./src/index.ts",
     "db:migrate": "pnpm exec prisma migrate dev",
