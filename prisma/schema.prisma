@@ -1,0 +1,543 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "src/app/generated/prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @unique @default(cuid())
+  name            String
+  email           String?
+  emailVerified   Boolean?
+  image           String?
+  createdAt       DateTime
+  updatedAt       DateTime
+  username        String?
+  displayUsername String?
+  lang            String
+  sessions        Session[]
+  accounts        Account[]
+
+  twoFactorEnabled Boolean?
+  twofactors       TwoFactor[]
+
+  stripeCustomerId String?
+
+  // New relation for task assignments
+  assignedTasks          TaskAssignment[]
+  Task                   Task[]
+  sentFriendRequests     Friendship[]      @relation("SentFriendRequests")
+  receivedFriendRequests Friendship[]      @relation("ReceivedFriendRequests")
+  chats                  ChatParticipant[]
+  messages               Message[]
+
+  ownedProjects      Project[]
+  projectMemberships ProjectMember[]
+
+  members     Member[]
+  invitations Invitation[]
+
+  teamResources  TeamResource[]
+  teamActivities TeamActivity[]
+
+  activeOrganizationId String?
+  UserProgress         UserProgress?
+  Milestone            Milestone[]
+
+  // New relations
+  moodEntries   MoodEntry[]
+  focusSessions FocusSession[]
+  schedulerModes SchedulerMode[]
+
+  @@unique([email])
+  @@unique([username])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @unique @default(cuid())
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  activeOrganizationId String?
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @unique @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id @unique @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model TwoFactor {
+  id          String @id @unique @default(cuid())
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("twoFactor")
+}
+
+model Subscription {
+  id                   String    @id @unique @default(cuid())
+  plan                 String
+  referenceId          String
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               String?
+  periodStart          DateTime?
+  periodEnd            DateTime?
+  cancelAtPeriodEnd    Boolean?
+  seats                Int?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  billing              String?
+  price                Float?
+  autoRenew            Boolean?  @default(true)
+
+  @@map("subscription")
+}
+
+model Task {
+  id String @id @unique @default(cuid())
+
+  title       String
+  description String
+  priority    String // "high", "medium", "low"
+  category    String
+  completed   Boolean   @default(false)
+  scheduled   Boolean   @default(false)
+  date        DateTime?
+  startTime   DateTime?
+  endTime     DateTime?
+  duration    Int? // Duration in minutes
+  tags        String[]
+  status      String? // For kanban view
+  order       Float? // For kanban sorting
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parentId String? // For sub-tasks
+  parent   Task?   @relation("SubTasks", fields: [parentId], references: [id], onDelete: SetNull)
+  subTasks Task[]  @relation("SubTasks")
+
+  resources TaskResource[]
+
+  // Task assignments
+  assignedTo TaskAssignment[]
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@map("task")
+}
+
+model TaskResource {
+  id       String  @id @unique @default(cuid())
+  name     String
+  type     String
+  category String // "file", "link", "note"
+  url      String?
+
+  // Relation to Task
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_resource")
+}
+
+model TaskAssignment {
+  id        String   @id @unique @default(cuid())
+  taskId    String
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@map("task_assignment")
+}
+
+model Friendship {
+  id        String   @id @unique @default(cuid())
+  status    String // "pending", "accepted", "blocked"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  senderId   String
+  receiverId String
+  sender     User   @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User   @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@map("friendship")
+}
+
+model Chat {
+  id           String            @id @unique @default(cuid())
+  name         String?
+  type         String // "individual" or "group"
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  messages     Message[]
+  participants ChatParticipant[]
+
+  @@map("chat")
+}
+
+model ChatParticipant {
+  id       String   @id @unique @default(cuid())
+  userId   String
+  chatId   String
+  role     String   @default("member") // "admin" or "member"
+  joinedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chatId])
+  @@map("chat_participant")
+}
+
+model Message {
+  id        String   @id @unique @default(cuid())
+  content   String
+  type      String   @default("text") // "text", "file", "image"
+  fileUrl   String?
+  fileName  String?
+  fileSize  Int?
+  senderId  String
+  chatId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  status    String   @default("sent") // "sent", "delivered", "read"
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@map("message")
+}
+
+model Project {
+  id          String    @id @unique @default(cuid())
+  name        String
+  description String
+  status      String // "not-started", "active", "on-hold", "completed"
+  priority    String // "low", "medium", "high"
+  progress    Float     @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Project metadata
+  tags     String[]
+  category String?
+
+  // Relations
+  ownerId String
+  owner   User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+  members ProjectMember[]
+
+  @@map("project")
+}
+
+model ProjectMember {
+  id       String   @id @unique @default(cuid())
+  role     String // "owner", "admin", "member"
+  joinedAt DateTime @default(now())
+
+  // Relations
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_member")
+}
+
+model Organization {
+  id          String       @id @unique @default(cuid())
+  name        String
+  slug        String?
+  logo        String?
+  createdAt   DateTime     @default(now())
+  metadata    String?
+  members     Member[]
+  invitations Invitation[]
+  teams       Team[]
+
+  @@unique([slug])
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id @unique @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String
+  teamId         String?
+  createdAt      DateTime     @default(now())
+
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id @unique @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  teamId         String?
+  status         String
+  expiresAt      DateTime
+  inviterId      String
+  user           User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@map("invitation")
+}
+
+model Team {
+  id             String       @id @unique @default(cuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime?    @updatedAt
+
+  tasks     Task[]
+  resources TeamResource[]
+  activity  TeamActivity[]
+
+  @@map("team")
+}
+
+model TeamResource {
+  id          String   @id @unique @default(cuid())
+  name        String
+  type        String // "file", "link", "document"
+  url         String?
+  size        Float? // Size in MB
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+  teamId      String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@map("team_resource")
+}
+
+model TeamActivity {
+  id        String   @id @unique @default(cuid())
+  type      String // "task", "member", "resource"
+  action    String // "created", "updated", "deleted", "completed"
+  details   Json? // Additional activity details
+  createdAt DateTime @default(now())
+  userId    String
+  teamId    String
+  user      User     @relation(fields: [userId], references: [id])
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@map("team_activity")
+}
+
+model UserProgress {
+  id             String       @id @unique @default(cuid())
+  userId         String       @unique
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level          Int          @default(1)
+  currentXP      Int          @default(0)
+  totalXP        Int          @default(0)
+  streakDays     Int          @default(0)
+  longestStreak  Int          @default(0)
+  lastStreakDate DateTime     @default(now())
+  goals          Goal[]
+  rewards        UserReward[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("user_progress")
+}
+
+model Goal {
+  id          String       @id @unique @default(cuid())
+  userId      String
+  user        UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        GoalType
+  xpReward    Int
+  progress    Int          @default(0)
+  status      String       @default("in-progress") // in-progress, completed
+  startDate   DateTime     @default(now())
+  endDate     DateTime?
+  completedAt DateTime?
+  targetDate  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("goal")
+}
+
+model Milestone {
+  id          String    @id @unique @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  xpReward    Int
+  coinReward  Int       @default(0)
+  unlocked    Boolean   @default(false)
+  unlockedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("milestone")
+}
+
+model Reward {
+  id          String       @id @unique @default(cuid())
+  title       String
+  description String
+  type        RewardType
+  unlockLevel Int?
+  cost        Int?
+  icon        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userRewards UserReward[]
+
+  @@map("reward")
+}
+
+model UserReward {
+  id         String       @id @unique @default(cuid())
+  userId     String
+  user       UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardId   String
+  reward     Reward       @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  unlocked   Boolean      @default(false)
+  equipped   Boolean      @default(false)
+  unlockedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([userId, rewardId])
+  @@map("user_reward")
+}
+
+model MoodEntry {
+  id        String   @id @unique @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mood      String // "great", "good", "neutral", "bad", "awful" 
+  energy    Int // 1-10 scale
+  note      String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("mood_entry")
+}
+
+model FocusSession {
+  id        String    @id @unique @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duration  Int // duration in minutes
+  type      String // "work", "shortBreak", "longBreak"
+  completed Boolean   @default(false)
+  startTime DateTime  @default(now())
+  endTime   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("focus_session")
+}
+
+model SchedulerMode {
+  id          String   @id @unique @default(cuid())
+  name        String
+  description String?
+  config      Json
+  isPreferred Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("scheduler_mode")
+}
+
+enum GoalType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  MILESTONE
+}
+
+enum RewardType {
+  THEME
+  AVATAR
+  BADGE
+  POWER_UP
+  TITLE
+  BACKGROUND
+  WIDGET
+  FEATURE
+}

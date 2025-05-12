@@ -1,0 +1,62 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node dist/index.js",
+    "build": "pnpm dlx tsc --build",
+    "build:watch": "pnpm dlx tsc --build --watch",
+    "dev": "nodemon ./src/index.ts",
+    "db:migrate": "pnpm exec prisma migrate dev",
+    "db:studio": "pnpm exec prisma studio",
+    "gcp-build": "tsc",
+    "deploy": "gcloud app deploy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.8.1",
+  "dependencies": {
+    "@better-auth/stripe": "^1.2.3",
+    "@daveyplate/better-auth-ui": "^1.2.19",
+    "@google/genai": "^0.7.0",
+    "@prisma/client": "^6.6.0",
+    "better-auth": "^1.2.7",
+    "cloudinary": "^2.6.0",
+    "cookie": "^1.0.2",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-forge": "^1.3.1",
+    "resend": "^4.1.2",
+    "socket.io": "^4.8.1",
+    "stripe": "^17.7.0",
+    "uploadthing": "^7.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/crypto-js": "^4.2.2",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.8",
+    "@types/node-cron": "^3.0.11",
+    "@types/node-forge": "^1.3.11",
+    "node-cron": "link:@types\\node-cron",
+    "nodemon": "^3.1.9",
+    "prisma": "^6.6.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "@prisma/client"
+    ],
+    "onlyBuiltDependencies": [
+      "@prisma/client"
+    ]
+  }
+}
